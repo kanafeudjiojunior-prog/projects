@@ -1,0 +1,433 @@
+<?php
+include 'connec.php';
+$sql = "SELECT 
+                    s.id,
+                    s.name AS specialty_name,
+                    s.description,
+                    s.departement_id,
+                    d.name AS department_name
+            FROM speciality s
+            JOIN deparment d ON s.departement_id = d.id
+            ORDER BY s.id ASC";
+
+$stmt = $conn->query($sql);
+$specialties = $stmt->fetchAll();
+
+//the total of enrollments
+$totalspecialty = count($specialties);
+
+
+// delete function
+if (isset($_GET['action']) && $_GET['action'] === 'delete' && !empty($_GET['id'])) {
+    $id_to_delete = (int)$_GET['id'];
+    $stmt = $conn->prepare("DELETE FROM speciality WHERE id = ?");
+    $stmt->execute([$id_to_delete]);
+
+    header("Location: speciality.php");
+    exit();
+}
+
+
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id = $_POST['id'] ?? '';
+    $name = $_POST['name'];
+    $description = $_POST['description'];
+    $department_id = $_POST['departement_id'];
+
+    if (!empty($name) && !empty($department_id)) {
+        if (!empty($id)) {
+            // Update existing specialty
+            $stmt = $conn->prepare("UPDATE speciality SET name = ?, description = ?, departement_id = ? WHERE id = ?");
+            $stmt->execute([$name, $description, $department_id, $id]);
+        } else {
+            // Insert new specialty
+            $stmt = $conn->prepare("INSERT INTO speciality (name, description, departement_id) VALUES (?, ?, ?)");
+            $stmt->execute([$name, $description, $department_id]);
+        }
+    }
+
+
+
+    header("Location: speciality.php");
+    exit();
+}
+
+//edit specialty function
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_specialty'])) {
+    $id = $_POST['specialty_id'];
+    $name = $_POST['name'];
+    $description = $_POST['description'] ?? '';
+    $department_id = $_POST['department_id'] ?? '';
+
+    if (!empty($id) && !empty($name) && !empty($description)) {
+        try {
+            $stmt = $conn->prepare("UPDATE speciality SET name = ?, description = ?, departement_id = ? WHERE id = ?");
+            $stmt->execute([$name, $description, $department_id, $id]);
+        } catch (PDOException $e) {
+            die("Error updating specialty: " . $e->getMessage());
+        }
+
+        header("Location: speciality.php?status=success");
+        exit();
+    }
+    header("Location: speciality.php");
+    exit();
+}
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Specialty</title>
+
+    <link rel="stylesheet" href="boostrap5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/3.0.3/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="select2/css/select2.min.css">
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+    <style>
+        .content {
+            width: 100%;
+            min-height: 100vh;
+            transition: all 2s ease;
+        }
+
+        .side-bar {
+            width: 200px;
+            background-color: #f8f9fa;
+            padding: 20px;
+            height: 100vh;
+        }
+
+        .nav-link {
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-left: 4px solid transparent;
+        }
+
+        .nav-link:hover {
+            color: #007bff;
+            border-left-color: #007bff;
+        }
+
+        .nav-link.active {
+            color: #007bff;
+            border-left-color: #007bff;
+        }
+
+        form {
+            padding: 20px;
+            text-align: left;
+        }
+
+        .d {
+            margin-bottom: 15px;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        .table {
+
+            margin-top: 20px;
+
+        }
+    </style>
+
+    <div style="display: flex; align-items: stretch; width: 100%;">
+        <nav id="sidebar">
+            <div>
+                <div class="row text-center" style="background-color: #007bff; padding: 10px;max-width: 213px;">
+                    <div class="col-12">
+                        <img src="media/LOGO-KFJ237.png" class="rounded-circle" alt="logo" width="50" height="50">
+                    </div>
+                    <div class="col-12">
+                        <p>ADMIN</p>
+                    </div>
+                </div>
+                <div class="side-bar">
+                    <div class="nav flex-column mt-3">
+                        <a href="enroll.php" class="nav-link" dep="enr">Enrollment</a>
+                        <a href="departement.php" class="nav-link" id="dep">department</a>
+                        <a href="speciality.php" class="nav-link" id="spec">specialty</a>
+                        <a href="level.php" class="nav-link" id="lev">level</a>
+                        <a href="student.php" class="nav-link" id="stu">student</a>
+                        <a href="index.php" class="nav-link mt-5 " style="color: red;"><i
+                                class="fas fa-sign-out-alt mr-3"></i>Logout</a>
+                    </div>
+                </div>
+            </div>
+
+        </nav>
+        <div class="content ">
+
+            <nav class="navbar navbar-expand-lg navbar-custom" style="background-color: #007bff;">
+                <div class="container-fluid">
+                    <button type="button" id="sidebarCollapse" class="btn text-white fs-4">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <div class="ms-auto text-white">
+                        <i class="fa-solid fa-bell fs-5 cursor-pointer"></i>
+                    </div>
+                </div>
+            </nav>
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom" style="padding: 5px;">
+                    <div>
+                        <h2 class="mb-0">Specialty Management</h2>
+                    </div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSpecialtyModal">
+                        <i class="fas fa-plus mr-2"></i> Specialty
+                    </button>
+                </div>
+
+                <!-- add specialty modal -->
+                <div class="modal fade" id="addSpecialtyModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="post" action="speciality.php" id="addSpecialtyForm">
+
+                                <input type="hidden" name="id">
+
+                                <div class="d">
+                                    <label for="name">Specialty Name</label>
+                                    <input type="text" id="name" name="name" class="form-control" required placeholder="Computer">
+                                </div>
+                                <div class="d">
+                                    <label for="description">Description</label>
+                                    <textarea id="description" name="description" class="form-control" required placeholder="SWE specialty description"></textarea>
+                                </div>
+                                <div class="d">
+                                    <label for="departement_id">Department</label>
+                                    <select name="departement_id" id="departement_id" class="form-control">
+                                        <option value="">Select Department</option>
+                                        <?php
+                                        $sql = "SELECT id, name FROM deparment";
+                                        $stmt = $conn->query($sql);
+                                        $departments = $stmt->fetchAll();
+                                        foreach ($departments as $department) {
+                                            echo '<option value="' . $department['id'] . '">' . $department['name'] . '</option>';
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                <div class="d">
+                                    <button type="submit" class="btn btn-primary">Add Specialty</button>
+                                    <button type="reset" class="btn btn-secondary">Reset</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- edit specialty modal -->
+                <div class="modal fade" id="editSpecialtyModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="post" id="editSpecialtyForm">
+
+                                <input type="hidden" name="id" id="edit_id">
+
+                                <div class="d">
+                                    <label for="name">Specialty Name</label>
+                                    <input type="text" id="edit_name" name="name" class="form-control" required>
+                                </div>
+                                <div class="d">
+                                    <label for="description">Description</label>
+                                    <textarea id="edit_description" name="description" class="form-control" required></textarea>
+                                </div>
+                                <div class="d">
+                                    <label for="departement_id">Department</label>
+                                    <select name="departement_id" id="edit_departement_id" class="form-control">
+                                        <option value="">Select Department</option>
+                                        <?php
+                                        $sql = "SELECT id, name FROM deparment";
+                                        $stmt = $conn->query($sql);
+                                        $departments = $stmt->fetchAll();
+                                        foreach ($departments as $department) {
+                                            echo '<option value="' . $department['id'] . '">' . $department['name'] . '</option>';
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                <div class="d">
+                                    <button type="submit" class="btn btn-primary" name="edit_specialty">edit Specialty</button>
+                                    <button type="reset" class="btn btn-secondary">Reset</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="container-fluid main-content mt-4">
+                    <div class="row g-3 mb-4">
+                        <div class="col-6">
+                            <div class="card border-0 shadow-sm p-3">
+                                <span class="text-muted">Total Specialties</span>
+                                <h3 class="fw-bold text-dark mb-0"><?php echo $totalspecialty ?></h3>
+                            </div>
+                        </div>
+                        <div class="col-6"></div>
+                    </div>
+
+                    <div class="card-body p-0 table-responsive-sm ">
+                        <table class="table table-hover mb-0 table">
+                            <thead class="thead-light">
+                                <tr>
+
+                                    <th>specialty name</th>
+                                    <th>description</th>
+                                    <th>department</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($specialties as $specialty): ?>
+                                    <tr>
+
+                                        <td><?= $specialty['specialty_name'] ?></td>
+                                        <td><?= $specialty['description'] ?></td>
+                                        <td><?= $specialty['department_name'] ?></td>
+                                        <td class="text-center">
+                                            <button
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editSpecialtyModal"
+                                                title="modify"
+                                                class="btn btn-sm btn-outline-info edit-btn"
+                                                data-id="<?= $specialty['id'] ?>"
+                                                data-name="<?= $specialty['specialty_name'] ?>"
+                                                data-description="<?= $specialty['description'] ?>"
+                                                data-departement_id="<?= $specialty['departement_id'] ?>">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <a href="speciality.php?action=delete&id=<?= $specialty['id'] ?>" title="delete" onclick="return confirm('do you want to delete this department ? ')" class="btn btn-sm btn-outline-danger delete-btn"><i
+                                                    class="fas fa-trash"></i></a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="row bg-dark text-light" style="margin-top: 25px;">
+
+                    <div class="col-12">
+                        <footer>
+                            <div class="row">
+                                <div class="col-sm-6 col-12">
+                                    <h4 style="margin-top: 5px;" class="text-center">my motto</h4>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div style=" margin: 10px;">
+                                                <a href="#"><img src="media/LOGO-KFJ237.png" class="img-fluid rounded-circle"
+                                                        alt="LOGO" width="70" height="70"></a>
+                                            </div>
+                                            <div style=" margin: 10px;">
+                                                <p>your goals, my code:</p>
+                                                <p>transforming complex technical needs into simple, secure, and seamless
+                                                    digital
+                                                    experience
+                                                </p>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6 col-12">
+                                    <h4 style="margin-top: 5px;" class="text-center">my services</h4>
+                                    <div class="row text-light">
+                                        <div class="col-sm-6 col-12">
+                                            <h3 class="text-light">Web development</h3>
+                                            <ul>
+                                                <li>professional showcase websites(vitrine)</li>
+                                                <li>custom web application and portals</li>
+                                                <li>landing page and sales tunnels</li>
+                                                <li>portfolio and interactive resume sites</li>
+                                                <li>e-commerce and online product catalogs</li>
+                                                <li>membership portals and online course platforms</li>
+                                                <li>dynamic forms and booking systems</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-sm-6 col-12">
+                                            <h3 class="text-light">social network</h3>
+                                            <ul>
+                                                <li>tiktok monetizable account</li>
+                                                <li>content creation training</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr style=" color: whitesmoke;">
+                            <div style="padding: 5px; text-align: center;">
+                                <p>Copyright &COPY; 2026 kana junior(KFJ237) </p>
+                            </div>
+                        </footer>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="jquery/jquery-4.0.0.js"></script>
+    <script src="boostrap5/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/3.0.3/js/dataTables.bootstrap5.min.js"></script>
+    <script>
+        jQuery.isArray = Array.isArray;
+
+        if (!jQuery.trim) {
+            jQuery.trim = function(text) {
+                return text == null ? "" : (text + "").replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '');
+            };
+        }
+    </script>
+    <script src="script.js"></script>
+    <script src="select2/js/select2.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#spec').addClass('active');
+
+            $('#departement_id').select2({
+                placeholder: "Select a department",
+                allowClear: true
+
+
+            });
+
+            $('#departement_id').select2({
+                dropdownParent: $('#addSpecialtyModal') // Remplacez "votreIDDeModal" par l'ID de votre modal Bootstrap
+            });
+            // Handle edit button click
+            $(document).on('click', '.edit-btn', function() {
+                let id = $(this).data('id');
+                let name = $(this).data('name');
+                let description = $(this).data('description');
+                let department_id = $(this).data('departement_id');
+
+                console.log('bouton clique');
+                console.log("ID:", id, name, "DESC:", description, "Dept ID:", department_id);
+
+                $('#edit_id').val(id);
+                $('#edit_name').val(name);
+                $('#edit_description').val(description);
+                $('#edit_departement_id').val(department_id).trigger('change');
+
+            });
+
+        });
+    </script>
+</body>
+
+</html>
